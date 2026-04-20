@@ -14,7 +14,8 @@ _DIFFICULTY = {
 
 class CourseFactory:
     @staticmethod
-    def create(title: str, description: str, base_price: float, category: str) -> Course:
+    def create(title: str, description: str, base_price: float, category: str,
+               tags: list[str] = None) -> Course:
         category = category.lower()
         if category not in _DIFFICULTY:
             raise ValueError(f"Unknown category: {category}. Use: {list(_DIFFICULTY)}")
@@ -27,12 +28,21 @@ class CourseFactory:
             "INSERT INTO courses (title, description, price, difficulty_level) VALUES (?, ?, ?, ?)",
             (title, description, price, cfg["level"])
         )
+        course_id = cursor.lastrowid
+
+        # Сохраняем теги для математической модели рекомендаций
+        for tag in (tags or []):
+            db.execute(
+                "INSERT OR IGNORE INTO course_tags (course_id, tag) VALUES (?, ?)",
+                (course_id, tag.lower())
+            )
+
         course = Course(
-            id=cursor.lastrowid,
+            id=course_id,
             title=title,
             description=description,
             price=price,
             difficulty_level=cfg["level"]
         )
-        logger.info(f"Created course: {course}")
+        logger.info(f"Created course: {course}, tags: {tags}")
         return course

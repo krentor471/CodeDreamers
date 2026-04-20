@@ -51,6 +51,13 @@ class DatabaseManager:
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (course_id) REFERENCES courses(id)
             );
+            CREATE TABLE IF NOT EXISTS course_tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_id INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                UNIQUE(course_id, tag),
+                FOREIGN KEY (course_id) REFERENCES courses(id)
+            );
         """)
         self._conn.commit()
         logger.info("Tables initialized")
