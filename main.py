@@ -76,15 +76,28 @@ def main():
 
     # -- 6. Strategy ---------------------------------------------------
     separator("6. STRATEGY — Уведомления")
-    print("  Default (Email):")
+    print(f"  Стратегия по умолчанию для student: {student._strategy.channel_name}")
+    print("  Отправка через Email (default для student):")
     student.notify("Welcome to CodeDreamers!")
+
+    print("  Смена стратегии на SMS:")
     student.set_notification_strategy(SMSNotification())
-    print("  Switched to SMS:")
     student.notify("Your course is ready!")
+
+    print("  Смена стратегии на Telegram:")
     student.set_notification_strategy(TelegramNotification())
-    print("  Switched to Telegram:")
     student.notify("New lesson available!")
+
+    # Возвращаем Email (default для student)
     student.set_notification_strategy(EmailNotification())
+
+    # История уведомлений из БД
+    notifs = db.fetchall("SELECT * FROM notifications ORDER BY id DESC LIMIT 3")
+    print(f"\n  Последние уведомления в БД ({len(notifs)}):")
+    print(f"  {'#':<4} {'channel':<10} {'recipient':<25} {'message'}")
+    print(f"  {'-'*4} {'-'*10} {'-'*25} {'-'*30}")
+    for n in reversed(notifs):
+        print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
 
     # -- 7. Command — Demo Student записывается и завершает курсы -----
     separator("7. COMMAND — Операции с курсом")
@@ -161,6 +174,14 @@ def main():
              db.fetchone("SELECT COUNT(*) as n FROM enrollments")["n"] +
              db.fetchone("SELECT COUNT(*) as n FROM course_tags")["n"])
     print(f"\n  TOTAL records in DB: {total}")
+
+    notifications = db.fetchall("SELECT * FROM notifications ORDER BY id")
+    print(f"\n  Notifications ({len(notifications)}):")
+    print(f"  {'#':<4} {'channel':<10} {'recipient':<25} {'message'}")
+    print(f"  {'-'*4} {'-'*10} {'-'*25} {'-'*35}")
+    for n in notifications:
+        print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
+
     print("\n  Все паттерны + рекомендательная система успешно продемонстрированы!\n")
 
 if __name__ == "__main__":

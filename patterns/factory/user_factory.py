@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from models.user import User
 from database import DatabaseManager
+from patterns.strategy.notification_strategy import DEFAULT_STRATEGY
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,17 @@ class UserFactory:
                 "INSERT INTO users (name, email, role) VALUES (?, ?, ?)",
                 (name, email, role)
             )
-            user = User(id=cursor.lastrowid, name=name, email=email, role=role)
-            logger.info(f"Created user: {user}")
+            # Назначаем стратегию уведомлений по умолчанию согласно роли:
+            #   student -> Email, mentor -> Telegram, admin -> SMS
+            strategy = DEFAULT_STRATEGY[role]
+            user = User(id=cursor.lastrowid, name=name, email=email,
+                        role=role, _strategy=strategy)
+            logger.info(f"Created user: {user} | strategy: {strategy.channel_name}")
             return user
         except Exception as e:
-            # Return in-memory user if DB insert fails (e.g. duplicate email in demo)
             row = db.fetchone("SELECT * FROM users WHERE email = ?", (email,))
             if row:
-                return User(id=row["id"], name=row["name"], email=row["email"], role=row["role"])
+                strategy = DEFAULT_STRATEGY[role]
+                return User(id=row["id"], name=row["name"], email=row["email"],
+                            role=row["role"], _strategy=strategy)
             raise e

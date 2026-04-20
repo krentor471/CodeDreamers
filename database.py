@@ -58,6 +58,13 @@ class DatabaseManager:
                 UNIQUE(course_id, tag),
                 FOREIGN KEY (course_id) REFERENCES courses(id)
             );
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel TEXT NOT NULL,
+                recipient TEXT NOT NULL,
+                message TEXT NOT NULL,
+                sent_at TEXT NOT NULL
+            );
         """)
         self._conn.commit()
         logger.info("Tables initialized")

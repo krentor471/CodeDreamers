@@ -8,5 +8,6 @@ class StudentObserver(CourseObserver):
 
     def update(self, course_title: str, event: str) -> None:
         message = f"[{course_title}] {event}"
-        print(f"  [Notification] for {self._user.name}:")
+        channel = self._user._strategy.channel_name.upper()
+        print(f"  [Notification via {channel}] for {self._user.name}:")
         self._user.notify(message)
