@@ -142,24 +142,51 @@ def main():
     for n in reversed(notifs):
         print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
 
-    # -- 7. Command — Demo Student записывается и завершает курсы -----
-    separator("7. COMMAND — Операции с курсом")
+    # -- 7. Command + State Machine -----------------------------------
+    separator("7. COMMAND + STATE MACHINE — Enrollment")
+    from patterns.state.enrollment_state import EnrollmentContext
     history = CommandHistory()
 
-    history.execute(EnrollCommand(student, c1))
+    print("  Переходы состояний Enrollment:")
+    print()
+
+    # (нет) -> ACTIVE
+    r = history.execute(EnrollCommand(student, c1))
+    print(f"  [*]       -> ACTIVE    : {r}")
+
+    # ACTIVE -> COMPLETED
+    r = history.execute(CompleteCourseCommand(student, c1))
+    print(f"  ACTIVE    -> COMPLETED : {r}")
+
+    # COMPLETED -> ACTIVE (reopen через undo)
+    r = history.undo_last()
+    print(f"  COMPLETED -> ACTIVE    : {r}")
+
+    # ACTIVE -> CANCELLED (cancel через undo enroll)
+    r = history.undo_last()
+    print(f"  ACTIVE    -> CANCELLED : {r}")
+
+    # CANCELLED -> ACTIVE (re-enroll)
+    r = history.execute(EnrollCommand(student, c1))
+    print(f"  CANCELLED -> ACTIVE    : {r}")
+
+    # ACTIVE -> COMPLETED (финально для рекомендаций)
     history.execute(CompleteCourseCommand(student, c1))
     history.execute(EnrollCommand(student, c4))
     history.execute(CompleteCourseCommand(student, c4))
-    print(f"  [OK] {student.name} completed: '{c1.title}', '{c4.title}'")
 
-    result = history.undo_last()
-    print(f"  [UNDO] {result}")
-    result = history.undo_last()
-    print(f"  [UNDO] {result}")
-
-    # Восстанавливаем для рекомендаций
-    history.execute(EnrollCommand(student, c4))
-    history.execute(CompleteCourseCommand(student, c4))
+    # Показываем статусы из БД
+    print()
+    rows = DatabaseManager().fetchall("""
+        SELECT e.status, u.name as uname, c.title as ctitle
+        FROM enrollments e
+        JOIN users u ON e.user_id=u.id
+        JOIN courses c ON e.course_id=c.id
+        WHERE e.user_id = ?
+    """, (student.id,))
+    print(f"  Enrollments for {student.name} (из БД):")
+    for row in rows:
+        print(f"    {row['ctitle']:<25} status: {row['status'].upper()}")
 
     # -- 8. Observer + Strategy ----------------------------------------
     separator("8. OBSERVER + STRATEGY — Новый урок -> уведомление")
@@ -208,8 +235,7 @@ def main():
     """)
     print(f"\n  Enrollments ({len(enrollments)}):")
     for e in enrollments:
-        status = "completed" if e['completed'] else "active"
-        print(f"    [{e['id']}] {e['uname']:<15} -> {e['ctitle']:<25} [{status}]")
+        print(f"    [{e['id']}] {e['uname']:<15} -> {e['ctitle']:<25} [{e['status'].upper()}]")
 
     total = (db.fetchone("SELECT COUNT(*) as n FROM users")["n"] +
              db.fetchone("SELECT COUNT(*) as n FROM courses")["n"] +

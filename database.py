@@ -47,6 +47,7 @@ class DatabaseManager:
                 user_id INTEGER NOT NULL,
                 course_id INTEGER NOT NULL,
                 completed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
                 UNIQUE(user_id, course_id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (course_id) REFERENCES courses(id)
