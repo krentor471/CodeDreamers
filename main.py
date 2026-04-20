@@ -18,6 +18,7 @@ from patterns.command.course_commands import EnrollCommand, CompleteCourseComman
 from patterns.strategy.notification_strategy import EmailNotification, SMSNotification, TelegramNotification
 from services.student_observer import StudentObserver
 from services.recommendation_service import recommend_courses
+from seed import seed
 
 logger = logging.getLogger(__name__)
 
@@ -37,44 +38,44 @@ def main():
     db2 = DatabaseManager()
     print(f"  DatabaseManager singleton: {db is db2}")
 
-    # -- 2. Factory — создаём пользователей и курсы с тегами ----------
-    separator("2. FACTORY — Создание пользователей и курсов")
-    student = UserFactory.create("Alice", "alice@example.com", "student")
-    mentor  = UserFactory.create("Bob",   "bob@example.com",   "mentor")
-    admin   = UserFactory.create("Carol", "carol@example.com", "admin")
-    print(f"  {student}")
-    print(f"  {mentor}")
-    print(f"  {admin}")
+    # -- 2. SEED — заполняем БД тестовыми данными ---------------------
+    separator("2. SEED — Заполнение БД")
+    counts = seed()
+    print(f"  users:       {counts['users']}")
+    print(f"  courses:     {counts['courses']}")
+    print(f"  lessons:     {counts['lessons']}")
+    print(f"  enrollments: {counts['enrollments']}")
+    print(f"  tags:        {counts['tags']}")
+    print(f"  TOTAL:       {sum(counts.values())} records")
 
-    # Создаём 5 курсов с тегами для работы рекомендательной системы
-    c1 = CourseFactory.create("Python Basics",      "Intro to Python",          100.0, "basic",
-                              tags=["python", "programming", "beginner"])
-    c2 = CourseFactory.create("Python Advanced",    "OOP, decorators, async",   100.0, "advanced",
-                              tags=["python", "programming", "oop"])
-    c3 = CourseFactory.create("Web with Django",    "Build web apps",           100.0, "advanced",
-                              tags=["python", "web", "django"])
-    c4 = CourseFactory.create("Algorithms",         "Sorting, graphs, DP",      100.0, "professional",
-                              tags=["algorithms", "programming", "math"])
-    c5 = CourseFactory.create("Data Science",       "Pandas, ML basics",        100.0, "professional",
-                              tags=["python", "math", "data", "ml"])
+    # Получаем объекты из БД для демонстрации паттернов
+    separator("3. FACTORY — Объекты для демонстрации паттернов")
+    student = UserFactory.create("Demo Student", "demo@example.com", "student")
+    c1_row = db.fetchone("SELECT * FROM courses WHERE title='Python Basics'")
+    c4_row = db.fetchone("SELECT * FROM courses WHERE title='Algorithms'")
+    from models.course import Course
+    c1 = Course(id=c1_row["id"], title=c1_row["title"], description=c1_row["description"],
+                price=c1_row["price"], difficulty_level=c1_row["difficulty_level"])
+    c4 = Course(id=c4_row["id"], title=c4_row["title"], description=c4_row["description"],
+                price=c4_row["price"], difficulty_level=c4_row["difficulty_level"])
+    print(f"  Demo user: {student}")
+    print(f"  Working with: '{c1.title}', '{c4.title}'")
 
-    print(f"\n  Courses created: {c1.title}, {c2.title}, {c3.title}, {c4.title}, {c5.title}")
-
-    # -- 3. Decorator --------------------------------------------------
-    separator("3. DECORATOR — Добавляем опции к курсу")
+    # -- 4. Decorator --------------------------------------------------
+    separator("4. DECORATOR — Добавляем опции к курсу")
     decorated = WithCertificate(WithMentorSupport(c1))
     print(f"  Base:          ${c1.get_price():.2f}")
     print(f"  + MentorSupport + Certificate: ${decorated.get_price():.2f}")
     print(f"  Description: {decorated.get_description()}")
 
-    # -- 4. Observer ---------------------------------------------------
-    separator("4. OBSERVER — Подписка на обновления курса")
+    # -- 5. Observer ---------------------------------------------------
+    separator("5. OBSERVER — Подписка на обновления курса")
     alice_observer = StudentObserver(student)
     c1.subscribe(alice_observer)
     print(f"  {student.name} subscribed to '{c1.title}'")
 
-    # -- 5. Strategy ---------------------------------------------------
-    separator("5. STRATEGY — Уведомления")
+    # -- 6. Strategy ---------------------------------------------------
+    separator("6. STRATEGY — Уведомления")
     print("  Default (Email):")
     student.notify("Welcome to CodeDreamers!")
     student.set_notification_strategy(SMSNotification())
@@ -85,79 +86,81 @@ def main():
     student.notify("New lesson available!")
     student.set_notification_strategy(EmailNotification())
 
-    # -- 6. Command — Alice записывается и завершает c1, c4 -----------
-    separator("6. COMMAND — Операции с курсом")
+    # -- 7. Command — Demo Student записывается и завершает курсы -----
+    separator("7. COMMAND — Операции с курсом")
     history = CommandHistory()
 
-    print("  Alice enrolls and completes Python Basics and Algorithms:")
     history.execute(EnrollCommand(student, c1))
-    history.execute(CompleteCourseCommand(student, c1))   # completed=1, вес x2 в профиле
+    history.execute(CompleteCourseCommand(student, c1))
     history.execute(EnrollCommand(student, c4))
-    history.execute(CompleteCourseCommand(student, c4))   # completed=1, вес x2 в профиле
-    print(f"  [OK] Alice completed: '{c1.title}', '{c4.title}'")
+    history.execute(CompleteCourseCommand(student, c4))
+    print(f"  [OK] {student.name} completed: '{c1.title}', '{c4.title}'")
 
     result = history.undo_last()
     print(f"  [UNDO] {result}")
     result = history.undo_last()
     print(f"  [UNDO] {result}")
 
-    # Восстанавливаем записи для рекомендаций
+    # Восстанавливаем для рекомендаций
     history.execute(EnrollCommand(student, c4))
     history.execute(CompleteCourseCommand(student, c4))
 
-    # -- 7. Observer + Strategy ----------------------------------------
-    separator("7. OBSERVER + STRATEGY — Новый урок -> уведомление")
+    # -- 8. Observer + Strategy ----------------------------------------
+    separator("8. OBSERVER + STRATEGY — Новый урок -> уведомление")
     c1.add_lesson("Variables and Data Types")
 
-    # -- 8. РЕКОМЕНДАТЕЛЬНАЯ СИСТЕМА -----------------------------------
-    separator("8. RECOMMENDATION — Косинусное сходство")
-
-    print("  Профиль Alice (пройденные курсы):")
-    print(f"    - '{c1.title}' [completed] tags: python, programming, beginner")
-    print(f"    - '{c4.title}' [completed] tags: algorithms, programming, math")
-    print()
-    print("  Вектор профиля Alice (сумма тегов с весом 2 за completed):")
-    print("    python=2, programming=4, beginner=2, algorithms=2, math=2")
+    # -- 9. РЕКОМЕНДАТЕЛЬНАЯ СИСТЕМА -----------------------------------
+    separator("9. RECOMMENDATION — Косинусное сходство")
+    print(f"  Профиль {student.name}: завершил '{c1.title}' и '{c4.title}'")
     print()
 
     recommendations = recommend_courses(user_id=student.id, top_n=3)
-
     print("  Рекомендации (косинусное сходство с профилем):")
-    print(f"  {'Курс':<25} {'Теги':<35} {'Сходство':>10}")
-    print(f"  {'-'*25} {'-'*35} {'-'*10}")
+    print(f"  {'Курс':<25} {'Теги':<30} {'Сходство':>10}")
+    print(f"  {'-'*25} {'-'*30} {'-'*10}")
     for rec in recommendations:
         tags_str = ", ".join(rec["tags"])
-        print(f"  {rec['title']:<25} {tags_str:<35} {rec['similarity']:>10.4f}")
-
-    print()
-    print("  Формула: similarity = (A . B) / (|A| * |B|)")
-    print("  Пример для 'Python Advanced' (python, programming, oop):")
-    print("    A (Alice) = {python:2, programming:4, beginner:2, algorithms:2, math:2}")
-    print("    B (курс)  = {python:1, programming:1, oop:1}")
-    print("    A . B     = 2*1 + 4*1 + 0 = 6")
-    print("    |A|       = sqrt(4+16+4+4+4) = sqrt(32) = 5.657")
-    print("    |B|       = sqrt(1+1+1)      = sqrt(3)  = 1.732")
-    print("    similarity= 6 / (5.657 * 1.732) = 0.6124")
+        print(f"  {rec['title']:<25} {tags_str:<30} {rec['similarity']:>10.4f}")
 
     # -- Итог из БД ----------------------------------------------------
     separator("ИТОГ — Данные в БД")
+
     users = db.fetchall("SELECT * FROM users")
     print(f"  Users ({len(users)}):")
     for u in users:
-        print(f"    [{u['id']}] {u['name']} — {u['role']}")
+        print(f"    [{u['id']}] {u['name']:<15} — {u['role']}")
 
     courses = db.fetchall("SELECT * FROM courses")
-    print(f"  Courses ({len(courses)}):")
+    print(f"\n  Courses ({len(courses)}):")
     for c in courses:
         tags = db.fetchall("SELECT tag FROM course_tags WHERE course_id=?", (c['id'],))
         tags_str = ", ".join(t['tag'] for t in tags)
-        print(f"    [{c['id']}] {c['title']:<25} ${c['price']:<8} tags: {tags_str}")
+        print(f"    [{c['id']}] {c['title']:<25} ${c['price']:<8.2f} [{c['difficulty_level']}]")
+        print(f"         tags: {tags_str}")
 
-    enrollments = db.fetchall("SELECT * FROM enrollments")
-    print(f"  Enrollments ({len(enrollments)}):")
+    lessons = db.fetchall("SELECT l.*, c.title as course_title FROM lessons l JOIN courses c ON l.course_id=c.id ORDER BY l.course_id, l.order_num")
+    print(f"\n  Lessons ({len(lessons)}):")
+    for l in lessons:
+        print(f"    [{l['id']}] {l['course_title']:<25} #{l['order_num']} {l['title']}")
+
+    enrollments = db.fetchall("""
+        SELECT e.*, u.name as uname, c.title as ctitle
+        FROM enrollments e
+        JOIN users u ON e.user_id=u.id
+        JOIN courses c ON e.course_id=c.id
+        ORDER BY e.user_id
+    """)
+    print(f"\n  Enrollments ({len(enrollments)}):")
     for e in enrollments:
-        print(f"    user={e['user_id']} course={e['course_id']} completed={e['completed']}")
+        status = "completed" if e['completed'] else "active"
+        print(f"    [{e['id']}] {e['uname']:<15} -> {e['ctitle']:<25} [{status}]")
 
+    total = (db.fetchone("SELECT COUNT(*) as n FROM users")["n"] +
+             db.fetchone("SELECT COUNT(*) as n FROM courses")["n"] +
+             db.fetchone("SELECT COUNT(*) as n FROM lessons")["n"] +
+             db.fetchone("SELECT COUNT(*) as n FROM enrollments")["n"] +
+             db.fetchone("SELECT COUNT(*) as n FROM course_tags")["n"])
+    print(f"\n  TOTAL records in DB: {total}")
     print("\n  Все паттерны + рекомендательная система успешно продемонстрированы!\n")
 
 if __name__ == "__main__":
