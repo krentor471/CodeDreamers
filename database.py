@@ -65,6 +65,14 @@ class DatabaseManager:
                 message TEXT NOT NULL,
                 sent_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS course_packages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_id INTEGER NOT NULL,
+                options TEXT NOT NULL,
+                final_price REAL NOT NULL,
+                description TEXT NOT NULL,
+                FOREIGN KEY (course_id) REFERENCES courses(id)
+            );
         """)
         self._conn.commit()
         logger.info("Tables initialized")

@@ -49,24 +49,67 @@ def main():
     print(f"  TOTAL:       {sum(counts.values())} records")
 
     # Получаем объекты из БД для демонстрации паттернов
-    separator("3. FACTORY — Объекты для демонстрации паттернов")
-    student = UserFactory.create("Demo Student", "demo@example.com", "student")
+    separator("3. FACTORY — Специализированные объекты")
+
+    # UserFactory возвращает Student / Mentor / Admin
+    student = UserFactory.create("Demo Student", "demo@example.com",  "student")
+    mentor  = UserFactory.create("Demo Mentor",  "mentor@example.com", "mentor")
+    admin   = UserFactory.create("Demo Admin",   "admin@example.com",  "admin")
+
+    print(f"  {student.__class__.__name__}: {student}")
+    print(f"    permissions : {student.get_permissions()}")
+    print(f"    discount    : {student.get_discount()*100:.0f}%")
+    print(f"    strategy    : {student._strategy.channel_name}")
+    print()
+    print(f"  {mentor.__class__.__name__}: {mentor}")
+    print(f"    permissions : {mentor.get_permissions()}")
+    print(f"    hourly_rate : ${mentor.get_hourly_rate():.2f}")
+    print(f"    strategy    : {mentor._strategy.channel_name}")
+    print()
+    print(f"  {admin.__class__.__name__}: {admin}")
+    print(f"    permissions : {admin.get_permissions()}")
+    print(f"    can_delete  : {admin.can_delete()}")
+    print(f"    strategy    : {admin._strategy.channel_name}")
+
+    # CourseFactory возвращает BasicCourse / AdvancedCourse / ProfessionalCourse
+    print()
     c1_row = db.fetchone("SELECT * FROM courses WHERE title='Python Basics'")
     c4_row = db.fetchone("SELECT * FROM courses WHERE title='Algorithms'")
-    from models.course import Course
-    c1 = Course(id=c1_row["id"], title=c1_row["title"], description=c1_row["description"],
-                price=c1_row["price"], difficulty_level=c1_row["difficulty_level"])
-    c4 = Course(id=c4_row["id"], title=c4_row["title"], description=c4_row["description"],
-                price=c4_row["price"], difficulty_level=c4_row["difficulty_level"])
-    print(f"  Demo user: {student}")
-    print(f"  Working with: '{c1.title}', '{c4.title}'")
+    from models.course import BasicCourse, ProfessionalCourse
+    c1 = BasicCourse(id=c1_row["id"], title=c1_row["title"],
+                     description=c1_row["description"], price=c1_row["price"])
+    c4 = ProfessionalCourse(id=c4_row["id"], title=c4_row["title"],
+                            description=c4_row["description"], price=c4_row["price"])
+    print(f"  {c1.__class__.__name__}: '{c1.title}'")
+    print(f"    max_students: {c1.get_max_students()} | support: {c1.get_support_level()}")
+    print(f"  {c4.__class__.__name__}: '{c4.title}'")
+    print(f"    max_students: {c4.get_max_students()} | support: {c4.get_support_level()}")
 
     # -- 4. Decorator --------------------------------------------------
-    separator("4. DECORATOR — Добавляем опции к курсу")
-    decorated = WithCertificate(WithMentorSupport(c1))
-    print(f"  Base:          ${c1.get_price():.2f}")
-    print(f"  + MentorSupport + Certificate: ${decorated.get_price():.2f}")
-    print(f"  Description: {decorated.get_description()}")
+    separator("4. DECORATOR — CourseBuilder + сохранение пакетов в БД")
+    from patterns.decorator.course_decorator import CourseBuilder
+
+    # Пакет 1: только сертификат
+    pkg1 = CourseBuilder(c1).add("certificate").build()
+    print(f"  Package 1: {pkg1.get_description()}")
+    print(f"             Price: ${pkg1.get_price():.2f}")
+
+    # Пакет 2: сертификат + ментор
+    pkg2 = CourseBuilder(c1).add("certificate").add("mentor_support").build()
+    print(f"  Package 2: {pkg2.get_description()}")
+    print(f"             Price: ${pkg2.get_price():.2f}")
+
+    # Пакет 3: все опции
+    pkg3 = CourseBuilder(c4).add("certificate").add("mentor_support").add("lifetime_access").build()
+    print(f"  Package 3: {pkg3.get_description()}")
+    print(f"             Price: ${pkg3.get_price():.2f}")
+
+    # Показываем сохранённые пакеты из БД
+    packages = db.fetchall("SELECT * FROM course_packages")
+    print(f"\n  Packages saved in DB ({len(packages)}):")
+    for p in packages:
+        print(f"    [{p['id']}] course_id={p['course_id']} | "
+              f"options: {p['options']} | ${p['final_price']:.2f}")
 
     # -- 5. Observer ---------------------------------------------------
     separator("5. OBSERVER — Подписка на обновления курса")
