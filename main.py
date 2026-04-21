@@ -1,4 +1,4 @@
-# main.py — CodeDreamers: демонстрация всех паттернов + рекомендательная система
+# main.py — CodeDreamers: все операции через интерфейс Command
 import os
 import sys
 import logging
@@ -11,320 +11,230 @@ if os.path.exists("codedreamers.db"):
 
 from config import ConfigManager
 from database import DatabaseManager
-from patterns.factory.user_factory import UserFactory
-from patterns.factory.course_factory import CourseFactory
-from patterns.decorator.course_decorator import WithCertificate, WithMentorSupport, WithLifetimeAccess
-from patterns.command.course_commands import EnrollCommand, CompleteCourseCommand, CommandHistory
-from patterns.strategy.notification_strategy import EmailNotification, SMSNotification, TelegramNotification
-from services.student_observer import StudentObserver
-from services.recommendation_service import recommend_courses
+from patterns.command.course_commands import (
+    EnrollCommand, UnenrollCommand, CompleteCourseCommand, CommandHistory
+)
+from patterns.command.system_commands import (
+    CreateUserCommand, ChangeStrategyCommand,
+    CreateCourseCommand, AddLessonCommand, ApplyDecoratorCommand,
+    RevenueReportCommand, TopStudentsCommand,
+    RecommendCommand, SubscribeCommand,
+    GenerateContentCommand,
+)
+from patterns.strategy.notification_strategy import SMSNotification, TelegramNotification
 from patterns.adapter.analytics_adapter import AnalyticsAdapter
-from services.system_observers import LogObserver, AuditObserver, AnalyticsObserver, NotificationObserver
 from patterns.observer.event_bus import EventBus
+from services.system_observers import (
+    LogObserver, AuditObserver, AnalyticsObserver, NotificationObserver
+)
+from models.course import BasicCourse, ProfessionalCourse
 from seed import seed
 
 logger = logging.getLogger(__name__)
 
+
 def separator(title: str):
-    print(f"\n{'='*55}")
+    print(f"\n{'='*60}")
     print(f"  {title}")
-    print('='*55)
+    print('='*60)
+
 
 def main():
-    # -- 1. Singleton --------------------------------------------------
+    # ── Singleton ─────────────────────────────────────────────────────
     separator("1. SINGLETON — Config & Database")
     cfg = ConfigManager()
-    cfg2 = ConfigManager()
-    print(f"  ConfigManager singleton: {cfg is cfg2}")
-    print(f"  App: {cfg.get('app_name')}, DB: {cfg.get('db_path')}")
-    db = DatabaseManager()
-    db2 = DatabaseManager()
-    print(f"  DatabaseManager singleton: {db is db2}")
+    db  = DatabaseManager()
+    print(f"  ConfigManager singleton: {cfg is ConfigManager()}")
+    print(f"  DatabaseManager singleton: {db is DatabaseManager()}")
 
-    # -- EventBus — инициализируем шину и подписчиков ------------------
-    separator("EVENT BUS — Инициализация системных наблюдателей")
+    # ── EventBus ──────────────────────────────────────────────────────
+    separator("EVENT BUS — Системные наблюдатели")
     bus = EventBus()
-    log_obs   = LogObserver()           # следит за ВСЕМИ событиями
-    audit_obs = AuditObserver()         # пишет критичные события в audit_log
-    anal_obs  = AnalyticsObserver()     # обновляет счётчики аналитики
-    notif_obs = NotificationObserver()  # отправляет уведомления
+    LogObserver()
+    AuditObserver()
+    AnalyticsObserver()
+    NotificationObserver()
     print(f"  EventBus singleton: {bus is EventBus()}")
-    print(f"  Подписчики: LogObserver, AuditObserver, AnalyticsObserver, NotificationObserver")
+    print("  Подписчики: Log, Audit, Analytics, Notification")
 
-    # -- 2. SEED — заполняем БД тестовыми данными ---------------------
+    # ── Seed ──────────────────────────────────────────────────────────
     separator("2. SEED — Заполнение БД")
     counts = seed()
-    print(f"  users:       {counts['users']}")
-    print(f"  courses:     {counts['courses']}")
-    print(f"  lessons:     {counts['lessons']}")
-    print(f"  enrollments: {counts['enrollments']}")
-    print(f"  tags:        {counts['tags']}")
-    print(f"  TOTAL:       {sum(counts.values())} records")
+    print(f"  users={counts['users']} courses={counts['courses']} "
+          f"lessons={counts['lessons']} enrollments={counts['enrollments']} "
+          f"tags={counts['tags']}  TOTAL={sum(counts.values())}")
 
-    # Получаем объекты из БД для демонстрации паттернов
-    separator("3. FACTORY — Специализированные объекты")
+    # ── Единый CommandHistory для всей системы ────────────────────────
+    history = CommandHistory()
 
-    # UserFactory возвращает Student / Mentor / Admin
-    student = UserFactory.create("Demo Student", "demo@example.com",  "student")
-    mentor  = UserFactory.create("Demo Mentor",  "mentor@example.com", "mentor")
-    admin   = UserFactory.create("Demo Admin",   "admin@example.com",  "admin")
+    # ── 3. CreateUserCommand ──────────────────────────────────────────
+    separator("3. COMMAND: CreateUserCommand")
+    cmd_student = CreateUserCommand("Demo Student", "demo@example.com",  "student")
+    cmd_mentor  = CreateUserCommand("Demo Mentor",  "mentor@example.com", "mentor")
+    cmd_admin   = CreateUserCommand("Demo Admin",   "admin@example.com",  "admin")
 
-    print(f"  {student.__class__.__name__}: {student}")
-    print(f"    permissions : {student.get_permissions()}")
-    print(f"    discount    : {student.get_discount()*100:.0f}%")
-    print(f"    strategy    : {student._strategy.channel_name}")
-    print()
-    print(f"  {mentor.__class__.__name__}: {mentor}")
-    print(f"    permissions : {mentor.get_permissions()}")
-    print(f"    hourly_rate : ${mentor.get_hourly_rate():.2f}")
-    print(f"    strategy    : {mentor._strategy.channel_name}")
-    print()
-    print(f"  {admin.__class__.__name__}: {admin}")
-    print(f"    permissions : {admin.get_permissions()}")
-    print(f"    can_delete  : {admin.can_delete()}")
-    print(f"    strategy    : {admin._strategy.channel_name}")
+    print(f"  >> {history.execute(cmd_student)}")
+    print(f"  >> {history.execute(cmd_mentor)}")
+    print(f"  >> {history.execute(cmd_admin)}")
 
-    # CourseFactory возвращает BasicCourse / AdvancedCourse / ProfessionalCourse
-    print()
+    student = cmd_student.result
+    mentor  = cmd_mentor.result
+    admin   = cmd_admin.result
+
+    print(f"\n  Student permissions : {student.get_permissions()}")
+    print(f"  Mentor  permissions : {mentor.get_permissions()}")
+    print(f"  Admin   permissions : {admin.get_permissions()}")
+
+    # Undo создания admin — демонстрация отмены
+    print(f"\n  {history.undo_last()}")
+
+    # ── 4. CreateCourseCommand ────────────────────────────────────────
+    separator("4. COMMAND: CreateCourseCommand")
     c1_row = db.fetchone("SELECT * FROM courses WHERE title='Python Basics'")
     c4_row = db.fetchone("SELECT * FROM courses WHERE title='Algorithms'")
-    from models.course import BasicCourse, ProfessionalCourse
     c1 = BasicCourse(id=c1_row["id"], title=c1_row["title"],
                      description=c1_row["description"], price=c1_row["price"])
     c4 = ProfessionalCourse(id=c4_row["id"], title=c4_row["title"],
                             description=c4_row["description"], price=c4_row["price"])
-    print(f"  {c1.__class__.__name__}: '{c1.title}'")
-    print(f"    max_students: {c1.get_max_students()} | support: {c1.get_support_level()}")
-    print(f"  {c4.__class__.__name__}: '{c4.title}'")
-    print(f"    max_students: {c4.get_max_students()} | support: {c4.get_support_level()}")
 
-    # -- 4. Decorator --------------------------------------------------
-    separator("4. DECORATOR — CourseBuilder + сохранение пакетов в БД")
-    from patterns.decorator.course_decorator import CourseBuilder
+    cmd_course = CreateCourseCommand(
+        "Machine Learning", "ML from scratch", 120.0, "professional",
+        tags=["python", "math", "ml", "data"]
+    )
+    print(f"  >> {history.execute(cmd_course)}")
+    new_course = cmd_course.result
 
-    # Пакет 1: только сертификат
-    pkg1 = CourseBuilder(c1).add("certificate").build()
-    print(f"  Package 1: {pkg1.get_description()}")
-    print(f"             Price: ${pkg1.get_price():.2f}")
+    # Undo создания курса
+    print(f"  {history.undo_last()}")
 
-    # Пакет 2: сертификат + ментор
-    pkg2 = CourseBuilder(c1).add("certificate").add("mentor_support").build()
-    print(f"  Package 2: {pkg2.get_description()}")
-    print(f"             Price: ${pkg2.get_price():.2f}")
+    # ── 5. ApplyDecoratorCommand ──────────────────────────────────────
+    separator("5. COMMAND: ApplyDecoratorCommand")
+    cmd_pkg1 = ApplyDecoratorCommand(c1, ["certificate"])
+    cmd_pkg2 = ApplyDecoratorCommand(c1, ["certificate", "mentor_support"])
+    cmd_pkg3 = ApplyDecoratorCommand(c4, ["certificate", "mentor_support", "lifetime_access"])
 
-    # Пакет 3: все опции
-    pkg3 = CourseBuilder(c4).add("certificate").add("mentor_support").add("lifetime_access").build()
-    print(f"  Package 3: {pkg3.get_description()}")
-    print(f"             Price: ${pkg3.get_price():.2f}")
+    print(f"  >> {history.execute(cmd_pkg1)}")
+    print(f"  >> {history.execute(cmd_pkg2)}")
+    print(f"  >> {history.execute(cmd_pkg3)}")
 
-    # Показываем сохранённые пакеты из БД
     packages = db.fetchall("SELECT * FROM course_packages")
-    print(f"\n  Packages saved in DB ({len(packages)}):")
+    print(f"\n  Packages in DB ({len(packages)}):")
     for p in packages:
-        print(f"    [{p['id']}] course_id={p['course_id']} | "
-              f"options: {p['options']} | ${p['final_price']:.2f}")
+        print(f"    [{p['id']}] {p['options']:<40} ${p['final_price']:.2f}")
 
-    # -- 5. Observer ---------------------------------------------------
-    separator("5. OBSERVER — Подписка на обновления курса")
-    alice_observer = StudentObserver(student)
-    c1.subscribe(alice_observer)
-    print(f"  {student.name} subscribed to '{c1.title}'")
+    # ── 6. SubscribeCommand ───────────────────────────────────────────
+    separator("6. COMMAND: SubscribeCommand")
+    cmd_sub = SubscribeCommand(student, c1)
+    print(f"  >> {history.execute(cmd_sub)}")
 
-    # -- 6. Strategy ---------------------------------------------------
-    separator("6. STRATEGY — Уведомления")
-    print(f"  Стратегия по умолчанию для student: {student._strategy.channel_name}")
-    print("  Отправка через Email (default для student):")
-    student.notify("Welcome to CodeDreamers!")
+    # ── 7. ChangeStrategyCommand ──────────────────────────────────────
+    separator("7. COMMAND: ChangeStrategyCommand")
+    print(f"  Current strategy: {student._strategy.channel_name}")
+    cmd_sms = ChangeStrategyCommand(student, SMSNotification())
+    print(f"  >> {history.execute(cmd_sms)}")
+    student.notify("Your account is ready!")
 
-    print("  Смена стратегии на SMS:")
-    student.set_notification_strategy(SMSNotification())
-    student.notify("Your course is ready!")
+    cmd_tg = ChangeStrategyCommand(student, TelegramNotification())
+    print(f"  >> {history.execute(cmd_tg)}")
+    student.notify("New course available!")
 
-    print("  Смена стратегии на Telegram:")
-    student.set_notification_strategy(TelegramNotification())
-    student.notify("New lesson available!")
+    # Undo — возвращаем SMS
+    print(f"  {history.undo_last()}")
+    # Undo — возвращаем Email
+    print(f"  {history.undo_last()}")
+    print(f"  Restored strategy: {student._strategy.channel_name}")
 
-    # Возвращаем Email (default для student)
-    student.set_notification_strategy(EmailNotification())
+    # ── 8. EnrollCommand / CompleteCourseCommand ──────────────────────
+    separator("8. COMMAND: Enroll + Complete + State Machine")
+    print(f"  >> {history.execute(EnrollCommand(student, c1))}")
+    print(f"  >> {history.execute(CompleteCourseCommand(student, c1))}")
+    print(f"  >> {history.execute(EnrollCommand(student, c4))}")
+    print(f"  >> {history.execute(CompleteCourseCommand(student, c4))}")
 
-    # История уведомлений из БД
-    notifs = db.fetchall("SELECT * FROM notifications ORDER BY id DESC LIMIT 3")
-    print(f"\n  Последние уведомления в БД ({len(notifs)}):")
-    print(f"  {'#':<4} {'channel':<10} {'recipient':<25} {'message'}")
-    print(f"  {'-'*4} {'-'*10} {'-'*25} {'-'*30}")
-    for n in reversed(notifs):
-        print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
-
-    # -- 7. Command + State Machine -----------------------------------
-    separator("7. COMMAND + STATE MACHINE — Enrollment")
-    from patterns.state.enrollment_state import EnrollmentContext
-    history = CommandHistory()
-
-    print("  Переходы состояний Enrollment:")
-    print()
-
-    # (нет) -> ACTIVE
-    r = history.execute(EnrollCommand(student, c1))
-    print(f"  [*]       -> ACTIVE    : {r}")
-
-    # ACTIVE -> COMPLETED
-    r = history.execute(CompleteCourseCommand(student, c1))
-    print(f"  ACTIVE    -> COMPLETED : {r}")
-
-    # COMPLETED -> ACTIVE (reopen через undo)
-    r = history.undo_last()
-    print(f"  COMPLETED -> ACTIVE    : {r}")
-
-    # ACTIVE -> CANCELLED (cancel через undo enroll)
-    r = history.undo_last()
-    print(f"  ACTIVE    -> CANCELLED : {r}")
-
-    # CANCELLED -> ACTIVE (re-enroll)
-    r = history.execute(EnrollCommand(student, c1))
-    print(f"  CANCELLED -> ACTIVE    : {r}")
-
-    # ACTIVE -> COMPLETED (финально для рекомендаций)
-    history.execute(CompleteCourseCommand(student, c1))
-    history.execute(EnrollCommand(student, c4))
-    history.execute(CompleteCourseCommand(student, c4))
-
-    # Показываем статусы из БД
-    print()
-    rows = DatabaseManager().fetchall("""
-        SELECT e.status, u.name as uname, c.title as ctitle
-        FROM enrollments e
-        JOIN users u ON e.user_id=u.id
-        JOIN courses c ON e.course_id=c.id
-        WHERE e.user_id = ?
+    rows = db.fetchall("""
+        SELECT e.status, c.title as ctitle FROM enrollments e
+        JOIN courses c ON e.course_id=c.id WHERE e.user_id=?
     """, (student.id,))
-    print(f"  Enrollments for {student.name} (из БД):")
-    for row in rows:
-        print(f"    {row['ctitle']:<25} status: {row['status'].upper()}")
+    print(f"\n  Enrollments for {student.name}:")
+    for r in rows:
+        print(f"    {r['ctitle']:<25} [{r['status'].upper()}]")
 
-    # -- 8. Observer + Strategy ----------------------------------------
-    separator("8. OBSERVER + STRATEGY — Новый урок -> уведомление")
-    c1.add_lesson("Variables and Data Types")
+    # ── 9. AddLessonCommand ───────────────────────────────────────────
+    separator("9. COMMAND: AddLessonCommand")
+    cmd_lesson = AddLessonCommand(c1, "List Comprehensions", "Advanced list syntax", 4)
+    print(f"  >> {history.execute(cmd_lesson)}")
+    print(f"  {history.undo_last()}")
+    print(f"  >> {history.execute(cmd_lesson)}")  # повторно
 
-    # -- 9. РЕКОМЕНДАТЕЛЬНАЯ СИСТЕМА -----------------------------------
-    separator("9. RECOMMENDATION — Косинусное сходство")
-    print(f"  Профиль {student.name}: завершил '{c1.title}' и '{c4.title}'")
-    print()
-
-    recommendations = recommend_courses(user_id=student.id, top_n=3)
-    print("  Рекомендации (косинусное сходство с профилем):")
-    print(f"  {'Курс':<25} {'Теги':<30} {'Сходство':>10}")
+    # ── 10. RecommendCommand ──────────────────────────────────────────
+    separator("10. COMMAND: RecommendCommand")
+    cmd_rec = RecommendCommand(student, top_n=3)
+    print(f"  >> {history.execute(cmd_rec)}")
+    print(f"\n  Recommendations for '{student.name}':")
+    print(f"  {'Course':<25} {'Tags':<30} {'Similarity':>10}")
     print(f"  {'-'*25} {'-'*30} {'-'*10}")
-    for rec in recommendations:
-        tags_str = ", ".join(rec["tags"])
-        print(f"  {rec['title']:<25} {tags_str:<30} {rec['similarity']:>10.4f}")
+    for rec in cmd_rec.result:
+        print(f"  {rec['title']:<25} {', '.join(rec['tags']):<30} {rec['similarity']:>10.4f}")
 
-    # -- 10. ADAPTER — Аналитика через адаптер -------------------------
-    separator("10. ADAPTER — Аналитика")
-    print("  ExternalAnalytics имеет несовместимый интерфейс (словари uid/cid).")
-    print("  AnalyticsAdapter преобразует User/Course -> формат ExternalAnalytics.")
-    print()
-
-    analytics = AnalyticsAdapter()
-
-    # enrollment_rate: Course -> course_record
-    rate = analytics.enrollment_rate(c1)
-    print(f"  enrollment_rate('{c1.title}'): {rate}%")
-    print(f"    (записано / всего пользователей * 100)")
-    print()
-
-    # completion_rate: User -> user_record + enrollments
-    comp = analytics.completion_rate(student)
-    print(f"  completion_rate('{student.name}'): {comp}%")
-    print(f"    (завершено / всего записей * 100)")
-    print()
-
-    # revenue_report: все курсы из БД
-    report = analytics.revenue_report()
-    print(f"  revenue_report (сгенерирован: {report['generated_at'][:19]}):")
-    print(f"  {'Курс':<25} {'Записей':>8} {'Выручка':>10}")
+    # ── 11. RevenueReportCommand ──────────────────────────────────────
+    separator("11. COMMAND: RevenueReportCommand")
+    cmd_rev = RevenueReportCommand()
+    print(f"  >> {history.execute(cmd_rev)}")
+    report = cmd_rev.result
+    print(f"\n  {'Course':<25} {'Enrolled':>8} {'Revenue':>10}")
     print(f"  {'-'*25} {'-'*8} {'-'*10}")
     for item in report["by_course"]:
         print(f"  {item['name']:<25} {item['enrolled']:>8} ${item['revenue']:>9.2f}")
-    print(f"  {'ИТОГО':<25} {'':>8} ${report['total']:>9.2f}")
+    print(f"  {'TOTAL':<25} {'':>8} ${report['total']:>9.2f}")
+
+    # ── 12. GenerateContentCommand (Template Method) ──────────────────
+    separator("12. TEMPLATE METHOD: GenerateContentCommand")
+    for fmt in ("text", "video", "quiz"):
+        cmd_gen = GenerateContentCommand("Python Decorators", fmt)
+        print(f"  >> {history.execute(cmd_gen)}")
+        for line in cmd_gen.result.splitlines():
+            print(f"     {line}")
+        print()
+
+    # ── 13. TopStudentsCommand ────────────────────────────────────────
+    separator("13. COMMAND: TopStudentsCommand")
+    cmd_top = TopStudentsCommand(top_n=3)
+    print(f"  >> {history.execute(cmd_top)}")
+    print(f"\n  Top students:")
+    for i, s in enumerate(cmd_top.result, 1):
+        print(f"    {i}. {s['uname']:<15} completed: {s['ucompleted']}")
+
+    # ── Итог: история команд ──────────────────────────────────────────
+    separator("ИТОГ — История команд")
+    print(f"  Всего команд в истории: {len(history._history)}")
     print()
+    for i, cmd in enumerate(history._history, 1):
+        print(f"  [{i:>2}] {cmd.__class__.__name__}")
 
-    # top_students: все студенты из БД
-    top = analytics.top_students(top_n=3)
-    print(f"  top_students (топ-3 по завершённым курсам):")
-    for i, s in enumerate(top, 1):
-        print(f"    {i}. {s['uname']:<15} завершил курсов: {s['ucompleted']}")
-
-    # -- Итог из БД ----------------------------------------------------
-    separator("ИТОГ — Данные в БД")
-
-    users = db.fetchall("SELECT * FROM users")
-    print(f"  Users ({len(users)}):")
-    for u in users:
-        print(f"    [{u['id']}] {u['name']:<15} — {u['role']}")
-
-    courses = db.fetchall("SELECT * FROM courses")
-    print(f"\n  Courses ({len(courses)}):")
-    for c in courses:
-        tags = db.fetchall("SELECT tag FROM course_tags WHERE course_id=?", (c['id'],))
-        tags_str = ", ".join(t['tag'] for t in tags)
-        print(f"    [{c['id']}] {c['title']:<25} ${c['price']:<8.2f} [{c['difficulty_level']}]")
-        print(f"         tags: {tags_str}")
-
-    lessons = db.fetchall("SELECT l.*, c.title as course_title FROM lessons l JOIN courses c ON l.course_id=c.id ORDER BY l.course_id, l.order_num")
-    print(f"\n  Lessons ({len(lessons)}):")
-    for l in lessons:
-        print(f"    [{l['id']}] {l['course_title']:<25} #{l['order_num']} {l['title']}")
-
-    enrollments = db.fetchall("""
-        SELECT e.*, u.name as uname, c.title as ctitle
-        FROM enrollments e
-        JOIN users u ON e.user_id=u.id
-        JOIN courses c ON e.course_id=c.id
-        ORDER BY e.user_id
-    """)
-    print(f"\n  Enrollments ({len(enrollments)}):")
-    for e in enrollments:
-        print(f"    [{e['id']}] {e['uname']:<15} -> {e['ctitle']:<25} [{e['status'].upper()}]")
-
-    total = (db.fetchone("SELECT COUNT(*) as n FROM users")["n"] +
-             db.fetchone("SELECT COUNT(*) as n FROM courses")["n"] +
-             db.fetchone("SELECT COUNT(*) as n FROM lessons")["n"] +
-             db.fetchone("SELECT COUNT(*) as n FROM enrollments")["n"] +
-             db.fetchone("SELECT COUNT(*) as n FROM course_tags")["n"])
-    print(f"\n  TOTAL records in DB: {total}")
-
-    notifications = db.fetchall("SELECT * FROM notifications ORDER BY id")
-    print(f"\n  Notifications ({len(notifications)}):")
-    print(f"  {'#':<4} {'channel':<10} {'recipient':<25} {'message'}")
-    print(f"  {'-'*4} {'-'*10} {'-'*25} {'-'*35}")
-    for n in notifications:
-        print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
-
-    print("\n  Все паттерны + рекомендательная система успешно продемонстрированы!\n")
-
-    # -- EventBus итог -----------------------------------------------
-    separator("EVENT BUS — Лог событий системы")
-    event_log = EventBus().get_log()
-    print(f"  Всего событий зафиксировано: {len(event_log)}")
-    print()
+    # ── EventBus лог ──────────────────────────────────────────────────
+    separator("EVENT BUS — Лог событий")
     from collections import Counter
-    counts = Counter(e.event_type for e in event_log)
+    event_log = EventBus().get_log()
+    counts_ev = Counter(e.event_type for e in event_log)
+    print(f"  Всего событий: {len(event_log)}")
+    print()
     print(f"  {'Event Type':<25} {'Count':>6}")
     print(f"  {'-'*25} {'-'*6}")
-    for etype, cnt in sorted(counts.items()):
+    for etype, cnt in sorted(counts_ev.items()):
         print(f"  {etype:<25} {cnt:>6}")
 
-    print()
-    audit = db.fetchall("SELECT * FROM audit_log ORDER BY id")
-    print(f"  Audit log ({len(audit)} записей):")
+    audit = db.fetchall("SELECT event_type, COUNT(*) as n FROM audit_log GROUP BY event_type")
+    print(f"\n  Audit log summary:")
     for a in audit:
-        print(f"    [{a['id']}] {a['event_type']:<22} {a['occurred_at']}")
+        print(f"    {a['event_type']:<25} {a['n']} records")
 
-    print()
     counters = db.fetchall("SELECT * FROM analytics_counters ORDER BY key")
-    print(f"  Analytics counters ({len(counters)}):")
+    print(f"\n  Analytics counters:")
     for c in counters:
         print(f"    {c['key']:<35} = {c['value']}")
+
+    print("\n  Все операции выполнены через интерфейс Command!\n")
+
 
 if __name__ == "__main__":
     main()
