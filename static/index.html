@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeDreamers</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__inner">
+      <span class="header__logo">CodeDreamers</span>
+      <nav class="header__nav">
+        <button class="nav-btn active" data-page="courses">Курсы</button>
+        <button class="nav-btn" data-page="my">Мои курсы</button>
+      </nav>
+      <div class="header__role">
+        <label>Роль:</label>
+        <select id="roleSelect">
+          <option value="student">Student</option>
+          <option value="mentor">Mentor</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- Страница: каталог курсов -->
+    <section id="page-courses" class="page active">
+      <h2 class="page__title">Каталог курсов</h2>
+      <div id="courseGrid" class="course-grid"></div>
+    </section>
+
+    <!-- Страница: мои курсы -->
+    <section id="page-my" class="page">
+      <h2 class="page__title">Мои курсы</h2>
+      <div id="myList" class="my-list"></div>
+    </section>
+
+    <!-- Страница: детали курса -->
+    <section id="page-detail" class="page">
+      <button class="back-btn" id="backBtn">&#8592; Назад</button>
+      <div id="detailContent"></div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+/* ── Reset & Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #1a1d27;
+  --surface2:  #22263a;
+  --accent:    #6c63ff;
+  --accent2:   #a78bfa;
+  --text:      #e2e8f0;
+  --muted:     #8892a4;
+  --border:    #2d3148;
+  --success:   #34d399;
+  --warn:      #fbbf24;
+  --radius:    12px;
+  --shadow:    0 4px 24px rgba(0,0,0,.4);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.header__logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent2);
+  letter-spacing: .5px;
+}
+.header__nav { display: flex; gap: 8px; flex: 1; }
+.header__role { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+.header__role select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+/* ── Nav buttons ──────────────────────────────────────────────────── */
+.nav-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: .95rem;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.nav-btn:hover { background: var(--surface2); color: var(--text); }
+.nav-btn.active { background: var(--accent); color: #fff; }
+
+/* ── Main ─────────────────────────────────────────────────────────── */
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+.page { display: none; }
+.page.active { display: block; }
+.page__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--text);
+}
+
+/* ── Course Grid ──────────────────────────────────────────────────── */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.course-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  cursor: pointer;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.course-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+.course-card__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.course-card__desc {
+  font-size: .875rem;
+  color: var(--muted);
+  flex: 1;
+}
+.course-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.course-card__price {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent2);
+}
+.badge {
+  font-size: .72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.badge--basic        { background: #1e3a5f; color: #60a5fa; }
+.badge--advanced     { background: #3b1f5e; color: var(--accent2); }
+.badge--professional { background: #1f3d2e; color: var(--success); }
+
+/* ── My courses list ──────────────────────────────────────────────── */
+.my-list { display: flex; flex-direction: column; gap: 12px; }
+
+.my-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.my-item:hover { border-color: var(--accent); }
+.my-item__title { font-weight: 600; }
+.my-item__status {
+  font-size: .8rem;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 20px;
+}
+.status--active    { background: #1e3a5f; color: #60a5fa; }
+.status--completed { background: #1f3d2e; color: var(--success); }
+
+/* ── Detail page ──────────────────────────────────────────────────── */
+.back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  font-size: .9rem;
+  transition: border-color .2s, color .2s;
+}
+.back-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.detail__title { font-size: 1.75rem; font-weight: 700; }
+.detail__meta  { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+.detail__price { font-size: 1.4rem; font-weight: 700; color: var(--accent2); }
+
+/* ── Program tree (Composite) ─────────────────────────────────────── */
+.program { display: flex; flex-direction: column; gap: 16px; }
+
+.program__block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.program__block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s;
+}
+.program__block-header:hover { background: #2a2f4a; }
+.program__block-title {
+  font-weight: 600;
+  font-size: .95rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.block-icon {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; color: #fff;
+}
+.chevron {
+  color: var(--muted);
+  transition: transform .25s;
+  font-size: 1rem;
+}
+.chevron.open { transform: rotate(180deg); }
+
+.program__lessons {
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.program__lessons.open { display: block; }
+
+.lesson-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+  cursor: pointer;
+}
+.lesson-item:last-child { border-bottom: none; }
+.lesson-item:hover { background: #1e2235; }
+.lesson-num {
+  width: 26px; height: 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.lesson-title { font-size: .9rem; font-weight: 500; }
+.lesson-content { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+
+/* ── Lesson modal ─────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  max-width: 520px;
+  width: 90%;
+  box-shadow: var(--shadow);
+  transform: translateY(16px);
+  transition: transform .2s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal__title { font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+.modal__content { color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.modal__close {
+  margin-top: 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .9rem;
+  transition: opacity .2s;
+}
+.modal__close:hover { opacity: .85; }
+
+/* ── Empty / error states ─────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 60px 0;
+  font-size: .95rem;
+}
+
+/* ── Skeleton loader ──────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-card {
+  height: 160px;
+  border-radius: var(--radius);
+}
