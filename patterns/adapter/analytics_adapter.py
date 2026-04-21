@@ -31,6 +31,7 @@ from models.user import User
 from models.course import Course
 from database import DatabaseManager
 from services.analytics_service import ExternalAnalytics
+from patterns.observer.event_bus import EventBus, AnalyticsEvent
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,12 @@ class AnalyticsAdapter(IAnalytics):
                 "cprice":   row["price"],
                 "cenrolled": enrolled_count,
             })
-        return self._analytics.get_revenue_report(course_records)
+        report = self._analytics.get_revenue_report(course_records)
+        EventBus().publish(AnalyticsEvent(
+            report_type="revenue_report",
+            result_summary=f"total=${report['total']}"
+        ))
+        return report
 
     def top_students(self, top_n: int = 3) -> list[dict]:
         users = self._db.fetchall(
@@ -155,4 +161,9 @@ class AnalyticsAdapter(IAnalytics):
                 "uname":      u["name"],
                 "ucompleted": completed,
             })
-        return self._analytics.get_top_students(student_records, top_n)
+        top = self._analytics.get_top_students(student_records, top_n)
+        EventBus().publish(AnalyticsEvent(
+            report_type="top_students",
+            result_summary=f"top={[s['uname'] for s in top]}"
+        ))
+        return top

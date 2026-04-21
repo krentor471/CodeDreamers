@@ -23,6 +23,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
+from patterns.observer.event_bus import EventBus, StateChangedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class ActiveState(EnrollmentState):
         ctx._save()
         msg = f"[{ctx.label}] ACTIVE -> COMPLETED"
         logger.info(msg)
+        EventBus().publish(StateChangedEvent(label=ctx.label, from_state="ACTIVE", to_state="COMPLETED"))
         return msg
 
     def cancel(self, ctx: "EnrollmentContext") -> str:
@@ -70,6 +72,7 @@ class ActiveState(EnrollmentState):
         ctx._save()
         msg = f"[{ctx.label}] ACTIVE -> CANCELLED"
         logger.info(msg)
+        EventBus().publish(StateChangedEvent(label=ctx.label, from_state="ACTIVE", to_state="CANCELLED"))
         return msg
 
     def reopen(self, ctx: "EnrollmentContext") -> str:
@@ -92,6 +95,7 @@ class CompletedState(EnrollmentState):
         ctx._save()
         msg = f"[{ctx.label}] COMPLETED -> CANCELLED"
         logger.info(msg)
+        EventBus().publish(StateChangedEvent(label=ctx.label, from_state="COMPLETED", to_state="CANCELLED"))
         return msg
 
     def reopen(self, ctx: "EnrollmentContext") -> str:
@@ -99,6 +103,7 @@ class CompletedState(EnrollmentState):
         ctx._save()
         msg = f"[{ctx.label}] COMPLETED -> ACTIVE"
         logger.info(msg)
+        EventBus().publish(StateChangedEvent(label=ctx.label, from_state="COMPLETED", to_state="ACTIVE"))
         return msg
 
 
@@ -112,6 +117,7 @@ class CancelledState(EnrollmentState):
         ctx._save()
         msg = f"[{ctx.label}] CANCELLED -> ACTIVE (re-enrolled)"
         logger.info(msg)
+        EventBus().publish(StateChangedEvent(label=ctx.label, from_state="CANCELLED", to_state="ACTIVE"))
         return msg
 
     def complete(self, ctx: "EnrollmentContext") -> str:

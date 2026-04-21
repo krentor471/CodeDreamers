@@ -19,6 +19,8 @@ from patterns.strategy.notification_strategy import EmailNotification, SMSNotifi
 from services.student_observer import StudentObserver
 from services.recommendation_service import recommend_courses
 from patterns.adapter.analytics_adapter import AnalyticsAdapter
+from services.system_observers import LogObserver, AuditObserver, AnalyticsObserver, NotificationObserver
+from patterns.observer.event_bus import EventBus
 from seed import seed
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,16 @@ def main():
     db = DatabaseManager()
     db2 = DatabaseManager()
     print(f"  DatabaseManager singleton: {db is db2}")
+
+    # -- EventBus — инициализируем шину и подписчиков ------------------
+    separator("EVENT BUS — Инициализация системных наблюдателей")
+    bus = EventBus()
+    log_obs   = LogObserver()           # следит за ВСЕМИ событиями
+    audit_obs = AuditObserver()         # пишет критичные события в audit_log
+    anal_obs  = AnalyticsObserver()     # обновляет счётчики аналитики
+    notif_obs = NotificationObserver()  # отправляет уведомления
+    print(f"  EventBus singleton: {bus is EventBus()}")
+    print(f"  Подписчики: LogObserver, AuditObserver, AnalyticsObserver, NotificationObserver")
 
     # -- 2. SEED — заполняем БД тестовыми данными ---------------------
     separator("2. SEED — Заполнение БД")
@@ -289,6 +301,30 @@ def main():
         print(f"  [{n['id']}] {n['channel']:<10} {n['recipient']:<25} {n['message'][:40]}")
 
     print("\n  Все паттерны + рекомендательная система успешно продемонстрированы!\n")
+
+    # -- EventBus итог -----------------------------------------------
+    separator("EVENT BUS — Лог событий системы")
+    event_log = EventBus().get_log()
+    print(f"  Всего событий зафиксировано: {len(event_log)}")
+    print()
+    from collections import Counter
+    counts = Counter(e.event_type for e in event_log)
+    print(f"  {'Event Type':<25} {'Count':>6}")
+    print(f"  {'-'*25} {'-'*6}")
+    for etype, cnt in sorted(counts.items()):
+        print(f"  {etype:<25} {cnt:>6}")
+
+    print()
+    audit = db.fetchall("SELECT * FROM audit_log ORDER BY id")
+    print(f"  Audit log ({len(audit)} записей):")
+    for a in audit:
+        print(f"    [{a['id']}] {a['event_type']:<22} {a['occurred_at']}")
+
+    print()
+    counters = db.fetchall("SELECT * FROM analytics_counters ORDER BY key")
+    print(f"  Analytics counters ({len(counters)}):")
+    for c in counters:
+        print(f"    {c['key']:<35} = {c['value']}")
 
 if __name__ == "__main__":
     main()

@@ -74,6 +74,16 @@ class DatabaseManager:
                 description TEXT NOT NULL,
                 FOREIGN KEY (course_id) REFERENCES courses(id)
             );
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                details TEXT NOT NULL,
+                occurred_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS analytics_counters (
+                key TEXT PRIMARY KEY,
+                value INTEGER DEFAULT 0
+            );
         """)
         self._conn.commit()
         logger.info("Tables initialized")

@@ -7,6 +7,7 @@ from models.user import User
 from models.course import Course
 from database import DatabaseManager
 from patterns.state.enrollment_state import EnrollmentContext, ActiveState
+from patterns.observer.event_bus import EventBus, EnrollEvent, UnenrollEvent, CompleteEvent
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,10 @@ class EnrollCommand(Command):
                 self._course.enrolled_students.append(self._user.id)
             msg = f"{self._user.name} enrolled in '{self._course.title}' [ACTIVE]"
             logger.info(msg)
+            EventBus().publish(EnrollEvent(
+                user_name=self._user.name, user_id=self._user.id,
+                course_title=self._course.title, course_id=self._course.id
+            ))
             return msg
         except Exception:
             # Уже записан — пробуем переоткрыть через State Machine
@@ -55,6 +60,10 @@ class EnrollCommand(Command):
         self._course.enrolled_students = [
             s for s in self._course.enrolled_students if s != self._user.id
         ]
+        EventBus().publish(UnenrollEvent(
+            user_name=self._user.name, user_id=self._user.id,
+            course_title=self._course.title, course_id=self._course.id
+        ))
         return f"UNDO: {result}"
 
 
@@ -92,7 +101,12 @@ class CompleteCourseCommand(Command):
             self._user.id, self._course.id,
             self._user.name, self._course.title
         )
-        return ctx.complete()
+        result = ctx.complete()
+        EventBus().publish(CompleteEvent(
+            user_name=self._user.name, user_id=self._user.id,
+            course_title=self._course.title, course_id=self._course.id
+        ))
+        return result
 
     def undo(self) -> str:
         ctx = EnrollmentContext.load(

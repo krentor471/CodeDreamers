@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from patterns.observer.course_observer import CourseSubject
+from patterns.observer.event_bus import EventBus, LessonAddedEvent
 
 
 @dataclass
@@ -30,6 +31,9 @@ class Course(CourseSubject):
 
     def add_lesson(self, lesson_title: str) -> None:
         self.notify_observers(self.title, f"New lesson added: '{lesson_title}'")
+        EventBus().publish(LessonAddedEvent(
+            course_title=self.title, lesson_title=lesson_title
+        ))
 
     def __str__(self):
         return self.get_description()
