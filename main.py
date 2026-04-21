@@ -18,6 +18,7 @@ from patterns.command.course_commands import EnrollCommand, CompleteCourseComman
 from patterns.strategy.notification_strategy import EmailNotification, SMSNotification, TelegramNotification
 from services.student_observer import StudentObserver
 from services.recommendation_service import recommend_courses
+from patterns.adapter.analytics_adapter import AnalyticsAdapter
 from seed import seed
 
 logger = logging.getLogger(__name__)
@@ -204,6 +205,42 @@ def main():
     for rec in recommendations:
         tags_str = ", ".join(rec["tags"])
         print(f"  {rec['title']:<25} {tags_str:<30} {rec['similarity']:>10.4f}")
+
+    # -- 10. ADAPTER — Аналитика через адаптер -------------------------
+    separator("10. ADAPTER — Аналитика")
+    print("  ExternalAnalytics имеет несовместимый интерфейс (словари uid/cid).")
+    print("  AnalyticsAdapter преобразует User/Course -> формат ExternalAnalytics.")
+    print()
+
+    analytics = AnalyticsAdapter()
+
+    # enrollment_rate: Course -> course_record
+    rate = analytics.enrollment_rate(c1)
+    print(f"  enrollment_rate('{c1.title}'): {rate}%")
+    print(f"    (записано / всего пользователей * 100)")
+    print()
+
+    # completion_rate: User -> user_record + enrollments
+    comp = analytics.completion_rate(student)
+    print(f"  completion_rate('{student.name}'): {comp}%")
+    print(f"    (завершено / всего записей * 100)")
+    print()
+
+    # revenue_report: все курсы из БД
+    report = analytics.revenue_report()
+    print(f"  revenue_report (сгенерирован: {report['generated_at'][:19]}):")
+    print(f"  {'Курс':<25} {'Записей':>8} {'Выручка':>10}")
+    print(f"  {'-'*25} {'-'*8} {'-'*10}")
+    for item in report["by_course"]:
+        print(f"  {item['name']:<25} {item['enrolled']:>8} ${item['revenue']:>9.2f}")
+    print(f"  {'ИТОГО':<25} {'':>8} ${report['total']:>9.2f}")
+    print()
+
+    # top_students: все студенты из БД
+    top = analytics.top_students(top_n=3)
+    print(f"  top_students (топ-3 по завершённым курсам):")
+    for i, s in enumerate(top, 1):
+        print(f"    {i}. {s['uname']:<15} завершил курсов: {s['ucompleted']}")
 
     # -- Итог из БД ----------------------------------------------------
     separator("ИТОГ — Данные в БД")
