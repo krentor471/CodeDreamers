@@ -22,6 +22,55 @@ class Command(ABC):
         pass
 
 
+class DeleteCourseCommand(Command):
+    """Удаляет курс из БД. Undo — восстанавливает (если реализовано)."""
+
+    def __init__(self, course_id: int):
+        self._course_id = course_id
+        self._backup_data = None  # для undo (опционально)
+
+    def execute(self) -> str:
+        from database import DatabaseManager
+        db = DatabaseManager()
+
+        # Сохраняем данные перед удалением (для undo)
+        course_row = db.fetchone("SELECT id, title FROM courses WHERE id = ?", (self._course_id,))
+        if not course_row:
+            raise ValueError(f"Курс с ID={self._course_id} не найден")
+
+        self._backup_data = dict(course_row)
+
+        # Удаляем зависимости
+        db.execute("DELETE FROM course_tags WHERE course_id = ?", (self._course_id,))
+        db.execute("DELETE FROM lessons WHERE course_id = ?", (self._course_id,))
+        db.execute("DELETE FROM enrollments WHERE course_id = ?", (self._course_id,))
+        db.execute("DELETE FROM modules WHERE course_id = ?", (self._course_id,))
+        # Удаляем сам курс
+        db.execute("DELETE FROM courses WHERE id = ?", (self._course_id,))
+
+        msg = f"Курс '{self._backup_data['title']}' (ID={self._course_id}) удалён"
+        return msg
+
+    def undo(self) -> str:
+        if not self._backup_data:
+            return "UNDO: невозможно восстановить — нет данных"
+
+        from database import DatabaseManager
+        db = DatabaseManager()
+        db.execute(
+            "INSERT INTO courses (id, title, description, price, category) VALUES (?, ?, ?, ?, ?)",
+            (
+                self._backup_data["id"],
+                self._backup_data["title"],
+                self._backup_data.get("description", ""),
+                self._backup_data.get("price", 0),
+                self._backup_data.get("category", "basic"),
+            )
+        )
+        return f"UNDO: курс '{self._backup_data['title']}' восстановлен"
+
+
+
 class EnrollCommand(Command):
     def __init__(self, user: User, course: Course):
         self._user = user

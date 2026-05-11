@@ -40,6 +40,7 @@ class CourseFactory:
 
         # Создаём специализированный подкласс
         course = cls(id=course_id, title=title, description=description, price=price)
+        course.difficulty_level = category  # устанавливаем после создания
         logger.info(
             f"Created {cls.__name__}: '{title}' ${price} "
             f"| max_students={course.get_max_students()} "

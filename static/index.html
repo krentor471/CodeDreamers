@@ -12,8 +12,11 @@
     <div class="header__inner">
       <span class="header__logo">CodeDreamers</span>
       <nav class="header__nav">
-        <button class="nav-btn active" data-page="courses">Курсы</button>
+        <button class="nav-btn active" data-page="courses">Каталог</button>
         <button class="nav-btn" data-page="my">Мои курсы</button>
+        <button class="nav-btn" data-page="create">+ Курс</button>
+        <button class="nav-btn" data-page="vector">Вектор</button>
+        <button class="nav-btn" data-page="admin">Админ</button>
       </nav>
       <div class="header__role">
         <label>Роль:</label>
@@ -23,30 +26,216 @@
           <option value="admin">Admin</option>
         </select>
       </div>
+      <div id="notifBell" class="notif-bell" title="Уведомления">
+        🔔 <span id="notifCount" class="notif-count hidden">0</span>
+        <div id="notifDropdown" class="notif-dropdown hidden">
+          <div class="notif-dropdown__header">
+            <span>Уведомления</span>
+            <button id="notifClear">Очистить</button>
+          </div>
+          <div id="notifList" class="notif-list"><p class="notif-empty">Нет уведомлений</p></div>
+        </div>
+      </div>
     </div>
   </header>
 
+  <!-- Push-уведомления -->
+  <div id="toastContainer" class="toast-container"></div>
+
   <main class="main">
 
-    <!-- Страница: каталог курсов -->
+    <!-- Каталог курсов -->
     <section id="page-courses" class="page active">
       <h2 class="page__title">Каталог курсов</h2>
       <div id="courseGrid" class="course-grid"></div>
     </section>
 
-    <!-- Страница: мои курсы -->
+    <!-- Мои курсы -->
     <section id="page-my" class="page">
       <h2 class="page__title">Мои курсы</h2>
       <div id="myList" class="my-list"></div>
     </section>
 
-    <!-- Страница: детали курса -->
+    <!-- Детали курса -->
     <section id="page-detail" class="page">
       <button class="back-btn" id="backBtn">&#8592; Назад</button>
       <div id="detailContent"></div>
     </section>
 
+    <!-- Прохождение курса -->
+    <section id="page-learn" class="page">
+      <button class="back-btn" id="backLearnBtn">&#8592; Назад</button>
+      <div id="learnContent"></div>
+    </section>
+
+    <!-- Создание курса -->
+    <section id="page-create" class="page">
+      <h2 class="page__title">Создать курс</h2>
+      <div class="form-card">
+        <div class="form-group">
+          <label>Название</label>
+          <input id="cTitle" type="text" placeholder="Python для начинающих" />
+        </div>
+        <div class="form-group">
+          <label>Описание</label>
+          <textarea id="cDesc" rows="3" placeholder="Описание курса..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Цена ($)</label>
+            <input id="cPrice" type="number" value="80" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Категория</label>
+            <select id="cCategory">
+              <option value="basic">Basic</option>
+              <option value="advanced">Advanced</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Теги <span class="muted">(через запятую)</span></label>
+          <div class="tag-row">
+            <input id="cTags" type="text" placeholder="python, web, beginner" />
+            <button class="btn-secondary" id="suggestTagsBtn">✨ AI теги</button>
+          </div>
+          <div id="tagPreview" class="tag-preview"></div>
+        </div>
+
+        <!-- Модули -->
+        <div class="form-group">
+          <label>Модули / Уроки</label>
+          <div id="moduleList" class="module-list"></div>
+          <button class="btn-secondary" id="addModuleBtn">+ Добавить урок</button>
+        </div>
+
+        <!-- Выбор модулей и дисциплин -->
+        <div class="form-group">
+          <label>Модули курса</label>
+          <div id="courseModules" class="course-modules-list"></div>
+          <div class="module-add-controls">
+            <input id="newModuleName" type="text" placeholder="Название модуля" style="flex:1" />
+            <button class="btn-secondary" id="addModuleToCourseBtn">+ Добавить модуль</button>
+          </div>
+        </div>
+        
+        <button class="btn-primary" id="createCourseBtn">Создать курс</button>
+        <div id="createResult" class="create-result"></div>
+      </div>
+    </section>
+
+    <!-- Вектор рекомендаций -->
+    <section id="page-vector" class="page">
+      <h2 class="page__title">Вектор рекомендаций</h2>
+      <div class="vector-controls">
+        <label>User ID:</label>
+        <input id="vectorUserId" type="number" value="1" min="1" style="width:80px" />
+        <button class="btn-primary" id="loadVectorBtn">Построить</button>
+      </div>
+      <canvas id="vectorCanvas" width="700" height="420"></canvas>
+      <div id="vectorLegend" class="vector-legend"></div>
+    </section>
+
+    <!-- Админ-панель -->
+    <section id="page-admin" class="page">
+      <h2 class="page__title">Админ-панель</h2>
+      <div class="admin-grid">
+
+        <!-- Командный интерфейс -->
+        <div class="admin-card" id="adminCardCmd">
+          <div class="admin-card__title">Командный интерфейс</div>
+          <div class="cmd-list">
+            <button class="cmd-btn" data-cmd="revenue">📊 Revenue Report</button>
+            <button class="cmd-btn" data-cmd="top">🏆 Top Students</button>
+            <button class="cmd-btn" data-cmd="events">📋 Event Log</button>
+            <button class="btn-danger" id="undoBtn">↶ Отменить последнюю команду</button>
+          </div>
+          <div id="cmdResult" class="cmd-result"></div>
+          <div id="undoResult" class="cmd-result"></div>
+        </div>
+
+        <!-- Состояние курса -->
+        <div class="admin-card" id="adminCardState">
+          <div class="admin-card__title">Состояние курса</div>
+          <div class="form-row">
+            <input id="stateCourseId" type="number" placeholder="Course ID" style="width:120px" />
+            <select id="stateAction">
+              <option value="assign_mentor">assign_mentor</option>
+              <option value="assign_user">assign_user</option>
+              <option value="start_progress">start_progress</option>
+              <option value="complete">complete</option>
+            </select>
+            <button class="btn-primary" id="stateBtn">Выполнить</button>
+          </div>
+          <div id="stateResult" class="cmd-result"></div>
+        </div>
+
+        <!-- AI Quiz -->
+        <div class="admin-card">
+          <div class="admin-card__title">AI Quiz генератор</div>
+          <div class="form-row">
+            <input id="quizTopic" type="text" placeholder="Тема..." style="flex:1" />
+            <button class="btn-primary" id="quizBtn">Генерировать</button>
+          </div>
+          <div id="quizResult" class="cmd-result"></div>
+        </div>
+
+        <!-- Дисциплины -->
+        <div class="admin-card admin-card--full">
+          <div class="admin-card__title">Дисциплины и уроки</div>
+          <div class="discipline-controls">
+            <input id="discTitle" type="text" placeholder="Название дисциплины" style="flex:1" />
+            <input id="discDesc" type="text" placeholder="Описание (опционально)" style="flex:1" />
+            <button class="btn-primary" id="createDiscBtn">+ Создать</button>
+          </div>
+          <div id="disciplineList" class="discipline-list"></div>
+        </div>
+
+        <!-- Пользователи -->
+        <div class="admin-card" id="adminCardUsers">
+          <div class="admin-card__title">Пользователи</div>
+          <button class="btn-secondary" id="loadUsersBtn">Загрузить</button>
+          <div id="usersResult" class="cmd-result"></div>
+        </div>
+
+        <!-- Уведомления -->
+        <div class="admin-card" id="adminCardNotify">
+          <div class="admin-card__title">🔔 Рассылка уведомлений</div>
+          <div class="form-group">
+            <textarea id="notifyMessage" rows="3" placeholder="Текст уведомления..."></textarea>
+          </div>
+          <button class="btn-primary" id="notifyBtn">📨 Отправить всем</button>
+          <div id="notifyResult" class="cmd-result"></div>
+        </div>
+
+      </div>
+    </section>
+
   </main>
+
+  <!-- AI чат (floating) -->
+  <div id="aiWidget" class="ai-widget">
+    <div class="ai-widget__header" id="aiToggle">
+      🤖 AI Ассистент <span id="aiChevron">▲</span>
+    </div>
+    <div class="ai-widget__body" id="aiBody">
+      <div id="aiMessages" class="ai-messages"></div>
+      <div class="ai-input-row">
+        <input id="aiQuestion" type="text" placeholder="Спроси ассистента..." />
+        <button id="aiSendBtn">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка урока -->
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal__title" id="modalTitle"></div>
+      <div class="modal__content" id="modalContent"></div>
+      <button class="modal__close" id="modalClose">Закрыть</button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

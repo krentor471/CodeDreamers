@@ -28,7 +28,7 @@ from abc import ABC, abstractmethod
 
 from models.user import User
 from models.course import Course
-from patterns.observer.event_bus import EventBus, LessonAddedEvent
+from patterns.observer.event_bus import EventBus, LessonAddedEvent, NotificationEvent
 
 logger = logging.getLogger(__name__)
 
@@ -152,18 +152,19 @@ class CreateCourseCommand(Command):
 class AddLessonCommand(Command):
     """Добавляет урок в курс. Undo — удаляет урок из БД."""
 
-    def __init__(self, course: Course, title: str, content: str, order_num: int):
+    def __init__(self, course: Course, title: str, content: str, order_num: int, module_id: int = None):
         self._course = course
         self._title = title
         self._content = content
         self._order_num = order_num
+        self._module_id = module_id
         self._lesson_id: int | None = None
 
     def execute(self) -> str:
         from database import DatabaseManager
         cursor = DatabaseManager().execute(
-            "INSERT INTO lessons (course_id, title, content, order_num) VALUES (?, ?, ?, ?)",
-            (self._course.id, self._title, self._content, self._order_num)
+            "INSERT INTO lessons (course_id, module_id, title, content, order_num) VALUES (?, ?, ?, ?, ?)",
+            (self._course.id, self._module_id, self._title, self._content, self._order_num)
         )
         self._lesson_id = cursor.lastrowid
         self._course.add_lesson(self._title)
@@ -343,6 +344,214 @@ class GenerateContentCommand(Command):
     @property
     def result(self) -> str | None:
         return self._result
+
+
+class ChangeStateCommand(Command):
+    """Изменяет состояние курса. Undo — возвращает предыдущее состояние."""
+
+    def __init__(self, course_id: int, action: str):
+        self._course_id = course_id
+        self._action = action
+        self._old_state = None
+        self._new_state = None
+
+    def execute(self) -> str:
+        from patterns.state.course_state import CourseContext
+        from database import DatabaseManager
+        
+        # Получаем текущее состояние
+        db = DatabaseManager()
+        row = db.fetchone("SELECT state FROM courses WHERE id = ?", (self._course_id,))
+        if not row:
+            raise ValueError(f"Course with ID={self._course_id} not found")
+        
+        self._old_state = row["state"] or "new"
+        
+        # Выполняем переход
+        ctx = CourseContext.load(self._course_id)
+        result = getattr(ctx, self._action)()
+        
+        # Получаем новое состояние
+        row = db.fetchone("SELECT state FROM courses WHERE id = ?", (self._course_id,))
+        self._new_state = row["state"] if row else "new"
+        
+        msg = f"State changed: {self._old_state} → {self._new_state}"
+        logger.info(msg)
+        return msg
+
+    def undo(self) -> str:
+        if self._old_state is None:
+            return "UNDO: no state to restore"
+        
+        from database import DatabaseManager
+        DatabaseManager().execute(
+            "UPDATE courses SET state = ? WHERE id = ?",
+            (self._old_state, self._course_id)
+        )
+        
+        msg = f"UNDO: state restored {self._new_state} → {self._old_state}"
+        logger.info(msg)
+        return msg
+
+
+class SendNotificationCommand(Command):
+    """Отправляет уведомление. Undo — удаляет из лога (если возможно)."""
+
+    def __init__(self, message: str, recipient: str = "all"):
+        self._message = message
+        self._recipient = recipient
+        self._notification_id = None
+
+    def execute(self) -> str:
+        from patterns.observer.event_bus import EventBus, NotificationEvent
+        from database import DatabaseManager
+        
+        # Сохраняем в БД для возможности отмены
+        db = DatabaseManager()
+        cursor = db.execute(
+            "INSERT INTO notifications (channel, recipient, message, timestamp) VALUES (?, ?, ?, datetime('now'))",
+            ("web", self._recipient, self._message)
+        )
+        self._notification_id = cursor.lastrowid
+        
+        # Отправляем через EventBus
+        EventBus().publish(NotificationEvent(
+            channel="web", recipient=self._recipient, message=self._message
+        ))
+        
+        msg = f"Notification sent to {self._recipient}: {self._message[:50]}..."
+        logger.info(msg)
+        return msg
+
+    def undo(self) -> str:
+        if self._notification_id:
+            from database import DatabaseManager
+            DatabaseManager().execute(
+                "DELETE FROM notifications WHERE id = ?", (self._notification_id,)
+            )
+            msg = f"UNDO: notification deleted (id={self._notification_id})"
+            logger.info(msg)
+            return msg
+        return "UNDO: nothing to undo"
+
+
+class CreateModuleCommand(Command):
+    """Создает модуль в курсе. Undo — удаляет модуль из БД."""
+
+    def __init__(self, course_id: int, title: str, order_num: int, teacher_id: int = None):
+        self._course_id = course_id
+        self._title = title
+        self._order_num = order_num
+        self._teacher_id = teacher_id
+        self._module_id: int | None = None
+
+    def execute(self) -> str:
+        from database import DatabaseManager
+        cursor = DatabaseManager().execute(
+            "INSERT INTO modules (course_id, title, order_num, teacher_id) VALUES (?, ?, ?, ?)",
+            (self._course_id, self._title, self._order_num, self._teacher_id)
+        )
+        self._module_id = cursor.lastrowid
+        msg = f"Module created in course {self._course_id}: '{self._title}'"
+        logger.info(msg)
+        return msg
+
+    def undo(self) -> str:
+        if self._module_id:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            db.execute("DELETE FROM module_disciplines WHERE module_id = ?", (self._module_id,))
+            db.execute("DELETE FROM modules WHERE id = ?", (self._module_id,))
+            msg = f"UNDO: removed module '{self._title}' (id={self._module_id})"
+            logger.info(msg)
+            self._module_id = None
+            return msg
+        return "UNDO: nothing to undo"
+
+    @property
+    def result(self) -> dict | None:
+        if self._module_id:
+            return {"id": self._module_id, "title": self._title, "order_num": self._order_num}
+        return None
+
+
+class AddDisciplineToModuleCommand(Command):
+    """Добавляет предмет в модуль. Undo — удаляет связь."""
+
+    def __init__(self, module_id: int, discipline_id: int, order_num: int = 1):
+        self._module_id = module_id
+        self._discipline_id = discipline_id
+        self._order_num = order_num
+        self._link_id: int | None = None
+
+    def execute(self) -> str:
+        from database import DatabaseManager
+        cursor = DatabaseManager().execute(
+            "INSERT OR IGNORE INTO module_disciplines (module_id, discipline_id, order_num) VALUES (?, ?, ?)",
+            (self._module_id, self._discipline_id, self._order_num)
+        )
+        self._link_id = cursor.lastrowid if cursor.lastrowid else self._get_link_id()
+        msg = f"Discipline {self._discipline_id} added to module {self._module_id}"
+        logger.info(msg)
+        return msg
+
+    def _get_link_id(self) -> int | None:
+        from database import DatabaseManager
+        row = DatabaseManager().fetchone(
+            "SELECT id FROM module_disciplines WHERE module_id=? AND discipline_id=?",
+            (self._module_id, self._discipline_id)
+        )
+        return row["id"] if row else None
+
+    def undo(self) -> str:
+        if self._link_id:
+            from database import DatabaseManager
+            DatabaseManager().execute(
+                "DELETE FROM module_disciplines WHERE id = ?", (self._link_id,)
+            )
+            msg = f"UNDO: removed discipline link (id={self._link_id})"
+            logger.info(msg)
+            return msg
+        return "UNDO: nothing to undo"
+
+
+class CreateDisciplineCommand(Command):
+    """Создает новый предмет (дисциплину). Undo — удаляет из БД."""
+
+    def __init__(self, title: str, description: str = "", content: str = ""):
+        self._title = title
+        self._description = description
+        self._content = content
+        self._discipline_id: int | None = None
+
+    def execute(self) -> str:
+        from database import DatabaseManager
+        cursor = DatabaseManager().execute(
+            "INSERT INTO disciplines (title, description, content) VALUES (?, ?, ?)",
+            (self._title, self._description, self._content)
+        )
+        self._discipline_id = cursor.lastrowid
+        msg = f"Discipline created: '{self._title}' (id={self._discipline_id})"
+        logger.info(msg)
+        return msg
+
+    def undo(self) -> str:
+        if self._discipline_id:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            db.execute("DELETE FROM module_disciplines WHERE discipline_id = ?", (self._discipline_id,))
+            db.execute("DELETE FROM disciplines WHERE id = ?", (self._discipline_id,))
+            msg = f"UNDO: removed discipline '{self._title}' (id={self._discipline_id})"
+            logger.info(msg)
+            self._discipline_id = None
+            return msg
+        return "UNDO: nothing to undo"
+
+    @property
+    def result(self) -> dict | None:
+        if self._discipline_id:
+            return {"id": self._discipline_id, "title": self._title}
+        return None
 
 
 # ── Подписки Observer ─────────────────────────────────────────────────────

@@ -57,7 +57,7 @@ class ActiveState(EnrollmentState):
         return "ACTIVE"
 
     def enroll(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Already ACTIVE"
+        return f"[{ctx.label}] Уже ACTIVE"
 
     def complete(self, ctx: "EnrollmentContext") -> str:
         ctx.state = CompletedState()
@@ -76,7 +76,7 @@ class ActiveState(EnrollmentState):
         return msg
 
     def reopen(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Already ACTIVE — cannot reopen"
+        return f"[{ctx.label}] Уже ACTIVE — нельзя переоткрыть"
 
 
 class CompletedState(EnrollmentState):
@@ -85,10 +85,10 @@ class CompletedState(EnrollmentState):
         return "COMPLETED"
 
     def enroll(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Already COMPLETED — cannot re-enroll"
+        return f"[{ctx.label}] Уже COMPLETED — нельзя записаться повторно"
 
     def complete(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Already COMPLETED"
+        return f"[{ctx.label}] Уже COMPLETED"
 
     def cancel(self, ctx: "EnrollmentContext") -> str:
         ctx.state = CancelledState()
@@ -121,10 +121,10 @@ class CancelledState(EnrollmentState):
         return msg
 
     def complete(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Cannot complete — CANCELLED"
+        return f"[{ctx.label}] Нельзя завершить — CANCELLED"
 
     def cancel(self, ctx: "EnrollmentContext") -> str:
-        return f"[{ctx.label}] Already CANCELLED"
+        return f"[{ctx.label}] Уже CANCELLED"
 
     def reopen(self, ctx: "EnrollmentContext") -> str:
         ctx.state = ActiveState()

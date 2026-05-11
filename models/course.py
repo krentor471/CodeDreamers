@@ -11,11 +11,14 @@ class Course(CourseSubject):
     title: str
     description: str
     price: float
-    difficulty_level: str
+    difficulty_level: str = "basic"  
     enrolled_students: list = field(default_factory=list)
 
     def __post_init__(self):
         super().__init__()
+        # Убедимся, что difficulty_level установлен
+        if not hasattr(self, 'difficulty_level') or self.difficulty_level is None:
+            self.difficulty_level = "basic"
 
     def get_price(self) -> float:
         return self.price

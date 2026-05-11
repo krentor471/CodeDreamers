@@ -16,6 +16,7 @@ class DatabaseManager:
             cls._instance._conn.row_factory = sqlite3.Row
             logger.info(f"Database connected: {db_path}")
             cls._instance._init_tables()
+            cls._instance._migrate()
         return cls._instance
 
     def _init_tables(self):
@@ -87,6 +88,53 @@ class DatabaseManager:
         """)
         self._conn.commit()
         logger.info("Tables initialized")
+
+    def _migrate(self):
+        """Safe migration — добавляет новые колонки и таблицы если их ещё нет."""
+        migrations = [
+            "ALTER TABLE courses ADD COLUMN state TEXT DEFAULT 'new'",
+            "ALTER TABLE lessons ADD COLUMN module_id INTEGER REFERENCES modules(id)",
+            "ALTER TABLE lessons ADD COLUMN discipline_id INTEGER REFERENCES disciplines(id)",
+        ]
+        for sql in migrations:
+            try:
+                self._conn.execute(sql)
+                self._conn.commit()
+            except Exception:
+                pass
+
+        # Таблицы модулей и дисциплин через migrate (не перезаписывают существующие)
+        self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS modules (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_id   INTEGER NOT NULL REFERENCES courses(id),
+                title       TEXT    NOT NULL,
+                order_num   INTEGER NOT NULL DEFAULT 1,
+                teacher_id  INTEGER REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS disciplines (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                title       TEXT NOT NULL,
+                description TEXT,
+                content     TEXT
+            );
+            CREATE TABLE IF NOT EXISTS module_disciplines (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                module_id     INTEGER NOT NULL REFERENCES modules(id),
+                discipline_id INTEGER NOT NULL REFERENCES disciplines(id),
+                order_num     INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(module_id, discipline_id)
+            );
+            CREATE TABLE IF NOT EXISTS lesson_progress (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id),
+                lesson_id   INTEGER NOT NULL REFERENCES lessons(id),
+                completed   INTEGER DEFAULT 0,
+                completed_at TEXT,
+                UNIQUE(user_id, lesson_id)
+            );
+        """)
+        self._conn.commit()
 
     @property
     def conn(self) -> sqlite3.Connection:

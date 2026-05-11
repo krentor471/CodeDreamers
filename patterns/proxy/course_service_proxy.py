@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 # Права доступа к ресурсам по роли
 _PERMISSIONS: dict[str, set[str]] = {
     "student": {"courses", "lessons", "enrollments", "program"},
-    "mentor":  {"courses", "lessons", "enrollments", "program", "users"},
-    "admin":   {"courses", "lessons", "enrollments", "program", "users", "analytics"},
+    "teacher": {"courses", "lessons", "enrollments", "program", "modules", "disciplines"},
+    "mentor":  {"courses", "lessons", "enrollments", "program", "users", "modules", "disciplines"},
+    "admin":   {"courses", "lessons", "enrollments", "program", "users", "analytics", "modules", "disciplines"},
 }
 
 

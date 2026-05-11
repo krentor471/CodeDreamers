@@ -79,6 +79,13 @@ class NotificationEvent(SystemEvent):
     recipient: str = ""
     message: str = ""
 
+@dataclass
+class LessonCompletedEvent(SystemEvent):
+    user_id: int = 0
+    lesson_id: int = 0
+    lesson_title: str = ""
+    course_id: int = 0
+
 
 # ── Шина событий (Singleton + Observer) ──────────────────────────────────
 
@@ -103,7 +110,8 @@ class EventBus:
         self._subscribers.setdefault(key, [])
         if handler not in self._subscribers[key]:
             self._subscribers[key].append(handler)
-            logger.debug(f"[EventBus] subscribed {handler.__self__.__class__.__name__} to {key}")
+            name = getattr(handler, '__self__', handler).__class__.__name__
+            logger.debug(f"[EventBus] subscribed {name} to {key}")
 
     def unsubscribe(self, event_class: type, handler: Callable) -> None:
         key = event_class.__name__
